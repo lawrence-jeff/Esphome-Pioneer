@@ -1,0 +1,374 @@
+esphome:
+  name: pioneer
+  platform: ESP8266
+  board: nodemcuv2
+
+wifi:
+  ssid: "2WIRE488"
+  password: "1701whitecolumns"
+  fast_connect: false
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Pioneer Fallback Hotspot"
+    password: "pv8l3Fcvc4lr"
+
+captive_portal:
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  services:
+    - service: raise_volume
+      then:
+        - switch.turn_on: volume_updown
+        
+    - service: lower_volume
+      then:
+        - switch.turn_off: volume_updown
+
+ota:
+
+text_sensor:
+  - platform: homeassistant
+    name: "Audio Source"
+    id: Audio_Source
+    entity_id: input_select.input
+    on_value:
+      then:
+        - lambda: |-
+            if (id(Audio_Source).state == "CD") {
+              id(station_na_inha).turn_on();
+              id(cd_input).turn_on();
+            } else if (id(Audio_Source).state == "Tuner") {
+              id(station_one_inha).turn_on();
+              id(tuner_input).turn_on();
+            } else if (id(Audio_Source).state == "LD") {
+              id(station_na_inha).turn_on();
+              id(ld_input).turn_on();
+            }else{
+              ESP_LOGD("main", "Unrecognized Option:");
+            }
+        - script.stop: station_scan_script
+          
+  - platform: homeassistant
+    name: "Station Preset"
+    id: tuner_station
+    entity_id: input_select.pioneer_station
+    on_value:
+      then:
+        - lambda: |-
+            if (id(tuner_station).state == "1") {
+              id(tuner_input).turn_on();
+              id(source_tuner_inha).turn_on();
+              id(tuner_one).turn_on();
+            } else if (id(tuner_station).state == "2") {
+              id(tuner_input).turn_on();
+              id(source_tuner_inha).turn_on();
+              id(tuner_two).turn_on();
+            } else if (id(tuner_station).state == "3") {
+              id(tuner_input).turn_on();
+              id(source_tuner_inha).turn_on();
+              id(tuner_three).turn_on();
+            } else if (id(tuner_station).state == "4") {
+              id(tuner_input).turn_on();
+              id(source_tuner_inha).turn_on();
+              id(tuner_four).turn_on();
+            } else if (id(tuner_station).state == "N/A") {
+              ESP_LOGD("main", "Do nothing");
+            }else{
+              ESP_LOGD("main", "Unrecognized Tuner Station:");
+            }
+
+  - platform: wifi_info
+    ip_address:
+      name: Pioneer Remote ESP IP Address
+    bssid:
+      name: BSSID
+
+binary_sensor:
+  - platform: status
+    name: Pioneer Remote ESP Status
+    
+  - platform: gpio
+    pin: D2
+    id: actual_power
+    name: "Pioneer Power State"
+    filters:
+      - delayed_on: 10ms
+    
+remote_receiver:
+  pin:
+    number: D5
+    inverted: True
+  dump: raw
+  
+remote_transmitter:
+  pin: D6
+  carrier_duty_percent: 50%
+
+switch:
+  - platform: template
+    name: "Master Power"
+    id: master_power
+    lambda: |-
+      if (id(actual_power).state) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9309, -4611, 482, -1802, 456, -594, 535, -1801, 457, -648, 480, -621, 508, -1802, 456, -620, 509, -1801, 457, -620, 508, -1801, 457, -620, 509, -1801, 457, -1747, 536, -594, 535, -1775, 483, -619, 510, -619, 510, -1801, 456, -619, 510, -1801, 457, -1801, 456, -620, 509, -619, 510, -590, 539, -1801, 457, -618, 510, -1801, 525, -550, 511, -617, 512, -1801, 456, -1747, 537, -1775, 483]
+  
+    turn_off_action:
+      remote_transmitter.transmit_raw:
+        code: [9037, -4798, 246, -1907, 351, -718, 411, -2011, 246, -719, 410, -751, 378, -2011, 247, -751, 377, -2012, 319, -678, 402, -1856, 454, -542, 580, -1942, 272, -1959, 301, -715, 412, -1985, 273, -717, 411, -1985, 273, -1985, 272, -619, 511, -1960, 324, -1958, 299, -691, 438, -691, 438, -690, 438, -592, 578, -551, 511, -1932, 352, -640, 489, -691, 485, -1833, 377, -1959, 299, -1932, 325]
+
+  - platform: template
+    id: cd_input
+    name: "Pioneer CD Input"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9150, -4500, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 567]
+  
+  - platform: template
+    id: ld_input
+    name: "Pioneer LD Input"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9150, -4556, 511, -1718, 614, -544, 536, -1722, 585, -544, 584, -544, 585, -1673, 585, -544, 584, -1700, 559, -570, 558, -1700, 558, -571, 557, -1700, 559, -1673, 561, -594, 558, -1699, 537, -591, 536, -1723, 584, -545, 584, -1700, 558, -1699, 559, -570, 558, -571, 558, -571, 558, -570, 558, -545, 584, -1700, 558, -544, 584, -572, 562, -1695, 559, -1699, 558, -1674, 562, -1720, 585]
+  
+  - platform: template
+    id: d_poweron
+    name: "Discrete Power On"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9309, -4611, 482, -1802, 456, -594, 535, -1801, 457, -648, 480, -621, 508, -1802, 456, -620, 509, -1801, 457, -620, 508, -1801, 457, -620, 509, -1801, 457, -1747, 536, -594, 535, -1775, 483, -619, 510, -619, 510, -1801, 456, -619, 510, -1801, 457, -1801, 456, -620, 509, -619, 510, -590, 539, -1801, 457, -618, 510, -1801, 525, -550, 511, -617, 512, -1801, 456, -1747, 537, -1775, 483]
+  
+  - platform: template
+    id: d_poweroff
+    name: "Discrete Power Off"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9037, -4798, 246, -1907, 351, -718, 411, -2011, 246, -719, 410, -751, 378, -2011, 247, -751, 377, -2012, 319, -678, 402, -1856, 454, -542, 580, -1942, 272, -1959, 301, -715, 412, -1985, 273, -717, 411, -1985, 273, -1985, 272, -619, 511, -1960, 324, -1958, 299, -691, 438, -691, 438, -690, 438, -592, 578, -551, 511, -1932, 352, -640, 489, -691, 485, -1833, 377, -1959, 299, -1932, 325]
+  
+  - platform: template
+    id: d_muteon
+    name: "Discrete Mute On"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9382, -4582, 510, -1747, 511, -618, 511, -1746, 511, -618, 511, -620, 509, -1747, 511, -618, 514, -1743, 564, -564, 513, -1746, 537, -590, 563, -1696, 537, -1721, 537, -592, 537, -1746, 511, -619, 510, -1749, 509, -618, 511, -618, 511, -591, 537, -1747, 511, -618, 515, -1744, 509, -621, 508, -622, 507, -1747, 513, -1745, 537, -1721, 536, -592, 537, -1747, 511, -618, 511, -1749, 508]
+  
+  - platform: template
+    id: d_muteoff
+    name: "Discrete Mute Off"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9304, -4635, 458, -1800, 457, -620, 510, -1799, 458, -619, 509, -620, 509, -1801, 457, -619, 510, -1800, 457, -620, 509, -1801, 527, -547, 512, -1746, 538, -1774, 484, -591, 537, -1800, 458, -618, 511, -592, 537, -1748, 509, -618, 511, -619, 510, -1800, 458, -617, 512, -1749, 508, -589, 540, -1749, 509, -616, 513, -1748, 510, -1746, 537, -590, 542, -1744, 510, -592, 537, -1750, 508]
+  
+  - platform: template
+    id: tuner_input
+    name: "Pioneer Tuner Input"
+    internal: true
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+        code: [9150, -4500, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 567]
+
+  - platform: template
+    name: "Pioneer Volume"  
+    id: volume_updown
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+    turn_off_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+      
+  - platform: template
+    name: "Pioneer Mute"  
+    id: volume_mute
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9382, -4582, 510, -1747, 511, -618, 511, -1746, 511, -618, 511, -620, 509, -1747, 511, -618, 514, -1743, 564, -564, 513, -1746, 537, -590, 563, -1696, 537, -1721, 537, -592, 537, -1746, 511, -619, 510, -1749, 509, -618, 511, -618, 511, -591, 537, -1747, 511, -618, 515, -1744, 509, -621, 508, -622, 507, -1747, 513, -1745, 537, -1721, 536, -592, 537, -1747, 511, -618, 511, -1749, 508]
+    turn_off_action:
+      remote_transmitter.transmit_raw:
+        code: [9304, -4635, 458, -1800, 457, -620, 510, -1799, 458, -619, 509, -620, 509, -1801, 457, -619, 510, -1800, 457, -620, 509, -1801, 527, -547, 512, -1746, 538, -1774, 484, -591, 537, -1800, 458, -618, 511, -592, 537, -1748, 509, -618, 511, -619, 510, -1800, 458, -617, 512, -1749, 508, -589, 540, -1749, 509, -616, 513, -1748, 510, -1746, 537, -590, 542, -1744, 510, -592, 537, -1750, 508]
+
+  - platform: template
+    name: "Pioneer Next Prefix"  
+    id: tuner_next
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 567]
+       
+  - platform: template
+    name: "Pioneer Set 1"  
+    id: tuner_one
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+
+  - platform: template
+    name: "Pioneer Set 2"  
+    id: tuner_two
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+       
+  - platform: template
+    name: "Pioneer Set 3"  
+    id: tuner_three
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+       
+  - platform: template
+    name: "Pioneer Set 4"  
+    id: tuner_four
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+
+  - platform: template
+    name: "Pioneer Set 5"  
+    id: tuner_five
+    turn_on_action:
+      remote_transmitter.transmit_raw:
+       code: [9150, -4500, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -560, 560, -1600, 560, -560, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 560, -1600, 567]
+
+  - platform: template
+    name: "Tuner Scan"  
+    id: tuner_scan
+    optimistic: true
+    #lambda: return {};
+    turn_on_action:
+      - script.execute: station_scan_script
+    turn_off_action:
+      - script.stop: station_scan_script
+
+  - platform: template
+    name: "Set Station to NA"  
+    internal: true
+    id: station_na_inha
+    turn_on_action:
+      - homeassistant.service:
+          service: input_select.select_option
+          data:
+            entity_id: input_select.pioneer_station
+            option: N/A
+            
+  - platform: template
+    name: "Set Input to Tuner"  
+    internal: true
+    id: source_tuner_inha
+    turn_on_action:
+      - homeassistant.service:
+            service: input_select.select_option
+            data:
+              entity_id: input_select.input
+              option: Tuner 
+
+  - platform: template
+    name: "Set Station to Default 1"  
+    internal: true
+    id: station_one_inha
+    turn_on_action:
+      - homeassistant.service:
+          service: input_select.select_option
+          data:
+            entity_id: input_select.pioneer_station
+            option: "1"
+            
+sensor:
+  - platform: adc
+    pin: A0
+    name: "Pioneer Actual Volume"
+    id: actual_volume
+    update_interval: 60s
+    accuracy_decimals: 1
+    unit_of_measurement: ""
+    filters:
+    - calibrate_linear:
+      # Map 0.0 (from sensor) to 0.0 (true value)
+      - 0.00 -> 0.0
+      - 0.03 -> 1.0
+      - 0.05 -> 2.0
+      - 0.08 -> 3.0
+      - 0.11 -> 4.0
+      - 0.14 -> 5.0
+      - 0.17 -> 6.0
+      - 0.20 -> 7.0
+      - 0.22 -> 8.0
+      - 0.25 -> 9.0
+      - 0.27 -> 10.0
+      
+  - platform: wifi_signal
+    name: "Signal Strength"
+    update_interval: 120s
+    
+  - platform: homeassistant
+    name: "Set Volume"
+    id: my_volume2
+    entity_id: input_number.pioneer_volume
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(my_volume2).state == 0.00;'
+            then:
+              - logger.log: "Mute Value Detected"
+              - switch.turn_on: volume_mute
+            else:
+              - logger.log: "Non Mute Value Detected, unmute"
+              - switch.turn_off: volume_mute
+        - logger.log:
+            format: " Change Detected in set volume %.1f"
+            args: [ 'id(my_volume2).state' ]
+        - while:
+            condition:
+              and:
+                - lambda: 'return (id(actual_volume).state + .4) < id(my_volume2).state;'
+                - lambda: 'return id(actual_power).state;'
+            then:
+            - logger.log:
+                format: " Incoming value %.0f and actual value %.1f  - **********Increase volume"
+                args: [ 'id(my_volume2).state', 'id(actual_volume).state' ]
+            - switch.turn_on: volume_updown
+            - delay: 1s
+            - component.update: actual_volume
+        - while:
+            condition:
+              and:
+                - lambda: 'return (id(actual_volume).state - .4) > id(my_volume2).state;'
+                - lambda: 'return id(actual_power).state;'
+            then:
+            - logger.log:
+                format: " Incoming value %.0f and actual value %.1f  - **********Reduce volume"
+                args: [ 'id(my_volume2).state', 'id(actual_volume).state' ]
+            - switch.turn_off: volume_updown
+            - delay: 1s
+            - component.update: actual_volume
+    
+script:
+  - id: station_scan_script
+    then:
+     - while:
+          condition:
+             lambda: 'return true;'
+          then:
+          - logger.log: "Station Scan"
+          - homeassistant.service:
+              service: input_select.select_next
+              data:
+                entity_id: input_select.pioneer_station
+          - delay: 5s
