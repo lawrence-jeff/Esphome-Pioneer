@@ -4,8 +4,8 @@ esphome:
   board: nodemcuv2
 
 wifi:
-  ssid: "2WIRE488"
-  password: "1701whitecolumns"
+  ssid: "**********"
+  password: "**********"
   fast_connect: false
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
